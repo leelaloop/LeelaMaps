@@ -1,18 +1,28 @@
 require('dotenv').config();
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 const db = require('./db');
+
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: '*'
+    // In production, specify your frontend origin here
+  }
+});
 
 const PORT = process.env.PORT || 4000;
 
 app.use(express.json());
 
-// Example route
+// Example HTTP route
 app.get('/', (req, res) => {
-  res.send('LeelaMaps backend running!');
+  res.send('LeelaMaps backend running with WebSocket!');
 });
 
-// Example: get all maps
+// Example API route
 app.get('/maps', async (req, res) => {
   try {
     const { rows } = await db.query('SELECT * FROM maps');
@@ -22,20 +32,25 @@ app.get('/maps', async (req, res) => {
   }
 });
 
-// Example: create a user
-app.post('/users', async (req, res) => {
-  const { username, email } = req.body;
-  try {
-    const { rows } = await db.query(
-      'INSERT INTO users (username, email) VALUES ($1, $2) RETURNING *',
-      [username, email]
-    );
-    res.status(201).json(rows[0]);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+// WebSocket event handlers
+io.on('connection', (socket) => {
+  console.log(`Socket connected: ${socket.id}`);
+
+  // Example: Broadcast a chat message to all clients
+  socket.on('chat message', (msg) => {
+    io.emit('chat message', msg);
+  });
+
+  // Example: Broadcast map update
+  socket.on('map update', (update) => {
+    io.emit('map update', update);
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`Socket disconnected: ${socket.id}`);
+  });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+server.listen(PORT, () => {
+  console.log(`Server listening on port ${PORT} (WebSocket enabled)`);
 });
