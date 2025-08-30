@@ -4,6 +4,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const db = require('./db');
 const { register, login, requireAuth } = require('./auth');
+const cors = require('cors');
 
 const app = express();
 const server = http.createServer(app);
@@ -17,6 +18,11 @@ const io = new Server(server, {
 const PORT = process.env.PORT || 4000;
 
 app.use(express.json());
+
+app.use(cors({
+  origin: '*', // For development only! Lock this down for production.
+  credentials: false // set to true if using cookies/auth headers
+}));
 
 // Example HTTP route
 app.get('/', (req, res) => {
