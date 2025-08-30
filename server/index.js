@@ -3,6 +3,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const db = require('./db');
+const { register, login, requireAuth } = require('./auth');
 
 const app = express();
 const server = http.createServer(app);
@@ -30,6 +31,18 @@ app.get('/maps', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// Authentication endpoints
+app.post('/auth/register', register);
+app.post('/auth/login', login);
+
+// Example protected route
+app.get('/profile', requireAuth, async (req, res) => {
+  // req.user is available here!
+  const { userId } = req.user;
+  const { rows } = await db.query('SELECT id, username, email FROM users WHERE id = $1', [userId]);
+  res.json(rows[0]);
 });
 
 // WebSocket event handlers

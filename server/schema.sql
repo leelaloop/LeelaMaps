@@ -15,3 +15,6 @@ CREATE TABLE IF NOT EXISTS maps (
   geom GEOMETRY, -- for geospatial data (enable PostGIS if needed)
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Add password_hash column for authentication
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255);
