@@ -9695,5 +9695,155 @@
             showNotification(`📍 New note added: ${note.title}`, 'success');
         }
     </script>
+    <script>
+        // --- CONFIG ---
+        const API_BASE = 'http://localhost:4000'; // Change if using different backend URL
+
+        // --- UTILITIES ---
+        function saveToken(token) { localStorage.setItem('jwt', token); }
+        function getToken() { return localStorage.getItem('jwt'); }
+        function clearToken() { localStorage.removeItem('jwt'); }
+
+        // --- UI ELEMENTS ---
+        const loginBtn = document.getElementById('loginBtn');
+        const registerBtn = document.getElementById('registerBtn');
+        const authModal = document.getElementById('authModal');
+        const authForm = document.getElementById('authForm');
+        const authTitle = document.getElementById('authTitle');
+        const authSwitchBtn = document.getElementById('authSwitchBtn');
+        const authSubmitBtn = document.getElementById('authSubmitBtn');
+        const authUsername = document.getElementById('authUsername');
+        const authPassword = document.getElementById('authPassword');
+        const authEmailField = document.getElementById('authEmailField');
+        const authEmail = document.getElementById('authEmail');
+        const closeAuthModal = document.getElementById('closeAuthModal');
+        const loggedInMenu = document.getElementById('loggedInMenu');
+        const loggedOutMenu = document.getElementById('loggedOutMenu');
+        const currentUserName = document.getElementById('currentUserName');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const instructionsLoginBtn = document.getElementById('instructionsLoginBtn');
+        const instructionsRegisterBtn = document.getElementById('instructionsRegisterBtn');
+
+        // --- MODAL STATE ---
+        let isLogin = true;
+
+        // --- SHOW/HIDE MODAL ---
+        function openAuthModal(mode) {
+          isLogin = (mode === 'login');
+          authModal.classList.remove('hidden');
+          updateAuthModal();
+        }
+        function closeModal() {
+          authModal.classList.add('hidden');
+          authForm.reset();
+        }
+        closeAuthModal.onclick = closeModal;
+
+        // --- UPDATE MODAL UI ---
+        function updateAuthModal() {
+          if (isLogin) {
+            authTitle.textContent = 'Login';
+            authSwitchBtn.textContent = 'Need an account? Register';
+            authEmailField.classList.add('hidden');
+            authUsername.parentElement.classList.add('hidden'); // Hide username field for login
+            authSubmitBtn.textContent = 'Login';
+          } else {
+            authTitle.textContent = 'Register';
+            authSwitchBtn.textContent = 'Already have an account? Login';
+            authEmailField.classList.remove('hidden');
+            authUsername.parentElement.classList.remove('hidden');
+            authSubmitBtn.textContent = 'Register';
+          }
+        }
+
+        // --- SWITCH LOGIN/REGISTER MODAL ---
+        authSwitchBtn.onclick = function() {
+          isLogin = !isLogin;
+          updateAuthModal();
+        };
+
+        // --- OPEN MODAL EVENTS ---
+        loginBtn.onclick = () => openAuthModal('login');
+        registerBtn.onclick = () => openAuthModal('register');
+        if (instructionsLoginBtn) instructionsLoginBtn.onclick = () => openAuthModal('login');
+        if (instructionsRegisterBtn) instructionsRegisterBtn.onclick = () => openAuthModal('register');
+
+        // --- FORM SUBMIT HANDLER ---
+        authForm.onsubmit = async function(e) {
+          e.preventDefault();
+          authSubmitBtn.disabled = true;
+          authSubmitBtn.textContent = isLogin ? 'Logging in...' : 'Registering...';
+          try {
+            const payload = isLogin
+              ? { email: authEmail.value, password: authPassword.value }
+              : { username: authUsername.value, email: authEmail.value, password: authPassword.value };
+            const endpoint = isLogin ? '/auth/login' : '/auth/register';
+            const res = await fetch(API_BASE + endpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Auth failed');
+            if (isLogin) {
+              saveToken(data.token);
+              await loadProfile();
+              closeModal();
+              showUserMenu();
+            } else {
+              // After registration, automatically log in
+              openAuthModal('login');
+            }
+          } catch (err) {
+            alert(err.message);
+          } finally {
+            authSubmitBtn.disabled = false;
+            authSubmitBtn.textContent = isLogin ? 'Login' : 'Register';
+          }
+        };
+
+        // --- LOAD PROFILE IF LOGGED IN ---
+        async function loadProfile() {
+          const token = getToken();
+          if (!token) {
+            showLoggedOutMenu();
+            return;
+          }
+          try {
+            const res = await fetch(API_BASE + '/profile', {
+              headers: { Authorization: 'Bearer ' + token }
+            });
+            if (!res.ok) throw new Error('Invalid session');
+            const user = await res.json();
+            currentUserName.textContent = user.username;
+            showUserMenu();
+          } catch {
+            clearToken();
+            showLoggedOutMenu();
+          }
+        }
+
+        // --- SHOW/HIDE MENUS BASED ON AUTH ---
+        function showUserMenu() {
+          loggedInMenu.classList.remove('hidden');
+          loggedOutMenu.classList.add('hidden');
+        }
+        function showLoggedOutMenu() {
+          loggedInMenu.classList.add('hidden');
+          loggedOutMenu.classList.remove('hidden');
+        }
+
+        // --- LOGOUT HANDLER ---
+        if (logoutBtn) logoutBtn.onclick = function() {
+          clearToken();
+          showLoggedOutMenu();
+          // Optionally reload to clear state
+          // location.reload();
+        };
+
+        // --- INITIALIZE UI ---
+        document.addEventListener('DOMContentLoaded', loadProfile);
+
+    </script>
 </body>
 </html>
