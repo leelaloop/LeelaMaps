@@ -17,6 +17,13 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 4000;
 
+const path = require('path');
+
+// Serve static files from the project root or 'client' folder
+app.use(express.static(path.join(__dirname, '..'))); // serves files from project root
+// OR if your frontend is in a client/ folder:
+// app.use(express.static(path.join(__dirname, '../client')));
+
 app.use(express.json());
 
 app.use(cors({
