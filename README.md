@@ -1,4 +1,5 @@
 This is an html UI for a new LeelaMaps
+generated with Poe
 
 It needs:
 * some PHP
