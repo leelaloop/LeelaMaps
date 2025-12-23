@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vector Style Map with Device Orientation</title>
+    <style>
+        /* Fullscreen style */
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Modal Styles */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            color: #fff;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background-color: #333;
+            border-radius: 10px;
+            padding: 20px;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .modal button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .modal button:hover {
+            background-color: #0056b3;
+        }
+
+        #auto-mode-btn, #recenter-btn {
+            position: fixed;
+            bottom: 50px;
+            margin: 5px;
+            padding: 10px;
+            z-index: 10000;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            cursor: pointer;
+        }
+
+        #auto-mode-btn {
+            right: 10px;
+        }
+
+        #recenter-btn {
+            left: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Map container -->
+    <div id="map"></div>
+
+    <!-- Modal Popup for enabling device orientation -->
+    <div class="modal" id="orientation-modal">
+        <div class="modal-content">
+            <h2>Enable Device Orientation</h2>
+            <p>This project uses your device's orientation to enhance the map experience. Please allow access to your device's orientation sensors for the best results.</p>
+            <button onclick="requestDeviceOrientationPermission()">Enable Device Orientation</button>
+        </div>
+    </div>
+
+    <button id="auto-mode-btn" onclick="toggleAutoMode()">Auto Mode: Off</button>
+    <button id="recenter-btn" onclick="recenterMap()">Recenter Map</button>
+
+    <!-- Include the Google Maps API -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCpHDBdlPUQzwKsU09YLLypja5y6bSRqjQ"></script>
+    
+    <script>
+        let map;
+        let userMarker;
+        let autoModeActive = false; // State to track if Auto mode is active
+        let currentUserPosition = null;
+        let initialHeading = 0;
+
+        // Function to initialize the map with a given heading
+        function initMap(initialHeading) {
+            const mapOptions = {
+                heading: initialHeading,
+                zoom: 15,
+                mapId: 'b443d600bfaf8bd9',
+                mapTypeId: 'satellite',
+                tilt: 45
+            };
+
+            map = new google.maps.Map(document.getElementById('map'), mapOptions);
+
+            if (navigator.geolocation) {
+                navigator.geolocation.watchPosition(
+                    (position) => {
+                        currentUserPosition = position;
+                        updateMarkerPosition(currentUserPosition);
+                    },
+                    () => {
+                        alert("Geolocation failed or permission denied.");
+                    },
+                    { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 }
+                );
+            } else {
+                alert("Geolocation is not supported by this browser.");
+            }
+        }
+
+        // Function to update the marker position on the map without automatically panning
+        function updateMarkerPosition(position) {
+            const userLocation = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude
+            };
+
+            if (!userMarker) {
+                userMarker = new google.maps.Marker({
+                    position: userLocation,
+                    map: map,
+                    title: "You are here",
+                    icon: {
+                        url: '/icons/rainbow.png',
+                        scaledSize: new google.maps.Size(30, 30),
+                        anchor: new google.maps.Point(15, 15)
+                    }
+                });
+            } else {
+                userMarker.setPosition(userLocation);
+            }
+        }
+
+        // Function to request device orientation permission and close the modal
+        function requestDeviceOrientationPermission() {
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(permissionState => {
+                        if (permissionState === 'granted') {
+                            toggleAutoMode(); // Automatically enable Auto mode after granting permission
+                        } else {
+                            alert("Permission to access device orientation was denied.");
+                        }
+                        closeOrientationModal();
+                    })
+                    .catch(console.error);
+            } else {
+                window.addEventListener('deviceorientation', handleAutoModeOrientation, true);
+                closeOrientationModal();
+            }
+        }
+
+        // Function to close the orientation modal
+        function closeOrientationModal() {
+            const modal = document.getElementById('orientation-modal');
+            modal.style.display = 'none';
+        }
+
+        // Function to toggle Auto mode
+        function toggleAutoMode() {
+            autoModeActive = !autoModeActive; // Toggle the Auto mode state
+            document.getElementById('auto-mode-btn').textContent = `Auto Mode: ${autoModeActive ? 'On' : 'Off'}`;
+
+            if (autoModeActive) {
+                window.addEventListener('deviceorientation', handleAutoModeOrientation, true);
+            } else {
+                window.removeEventListener('deviceorientation', handleAutoModeOrientation, true);
+            }
+        }
+
+        // Function to handle device orientation in Auto mode
+        function handleAutoModeOrientation(event) {
+            if (!autoModeActive) return; // Exit if Auto mode is not active
+
+            // Determine the heading using the device's orientation data
+            let adjustedHeading = event.webkitCompassHeading || (360 - event.alpha) % 360 || 0;
+
+            let tilt = 0;
+            let zoom = 15;
+
+            if (event.beta !== undefined && Math.abs(event.beta) < 10) {
+                tilt = 67.5;
+                zoom = 13;
+            } else if (event.beta !== undefined) {
+                tilt = 67.5 * (Math.abs(event.beta) / 90);
+                zoom = 15 + (5 * (Math.abs(event.beta) / 90));
+            }
+
+            // Move the camera based on the adjusted heading, tilt, and zoom
+            map.moveCamera({
+                heading: adjustedHeading,
+                tilt: tilt,
+                zoom: zoom
+            });
+        }
+
+        // Initialize the map when the page loads
+        window.onload = initMap;
+    </script>
+
+</body>
+</html>
